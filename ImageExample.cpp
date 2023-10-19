@@ -53,7 +53,7 @@ HRESULT ImageExample::LoadBMP(LPCUWSTR filename, ID2D1Bitmap** ppBitmap)
 			pixels[index++] = b;
 			pixels[index++] = g;
 			pixels[index++] = r;
-			pixels[index++] = a;
+			pixels[index++] = a; 
 		}
 	}
 
