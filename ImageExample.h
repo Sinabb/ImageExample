@@ -17,6 +17,6 @@ public:
 	virtual HRESULT Initialize(HINSTANCE hinstance, LPCWSTR title = L"ImagesExample"
 	);
 	void Render() override;
-	void Release() override;
+	void Release() override; 
 };
 
