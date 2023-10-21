@@ -4,9 +4,8 @@
 #include <exception>
 #include <stdio.h>
 
-// Com Exception
-class com_exception : public std::exception
-{
+// COM Exception
+class com_exception : public std::exception {
 private:
 	HRESULT result;
 
@@ -15,7 +14,7 @@ public:
 	virtual const char* what() const override
 	{
 		static char str[64]{};
-		sprintf_s(str, "Failed HRESULT : %08X", result);
+		sprintf_s(str, "Failed with HRESUL : %08X\n", result); 
 		return str;
 	}
 };
@@ -31,7 +30,7 @@ inline void ThrowIfFailed(HRESULT hr)
 class D2DFramework
 {
 private:
-	const LPCWSTR gClassName{ L"WindowClass" };
+	const LPCWSTR gClassName{ L"MyWindowClass" };
 
 protected:
 	HWND mHwnd{};
@@ -47,7 +46,6 @@ protected:
 
 public:
 	virtual HRESULT Initialize(HINSTANCE hInstance, LPCWSTR title = L"D2DFramework", UINT w = 1024, UINT h = 768);
-
 	virtual void Release();
 	virtual int GameLoop();
 	virtual void Render();

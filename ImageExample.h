@@ -1,22 +1,24 @@
 #pragma once
+
 #include <wincodec.h>
 #include "D2DFramework.h"
-class ImageExample : public D2DFramework
+
+class ImageExample :
+    public D2DFramework
 {
-	Microsoft::WRL::ComPtr<IWICImagingFactory> mspWICFactoy;
-	Microsoft::WRL::ComPtr<ID2D1Bitmap> mspBitmap;
+    Microsoft::WRL::ComPtr<IWICImagingFactory> mspWICFactory;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> mspBitmap;
 
 private:
-	HRESULT LoadBMP(LPCUWSTR filename, ID2D1Bitmap** ppBitmap);
-	HRESULT LoadWIC(LPCUWSTR filename, ID2D1Bitmap** ppBitmap);
+    HRESULT LoadBMP(LPCWSTR filename, ID2D1Bitmap** ppBitmap);
+    HRESULT LoadWIC(LPCWSTR filename, ID2D1Bitmap** ppBitmap);
 
 protected:
-	virtual HRESULT CreateDeviceResources() override;
+    virtual HRESULT CreateDeviceResources() override;
 
 public:
-	virtual HRESULT Initialize(HINSTANCE hinstance, LPCWSTR title = L"ImagesExample"
-	);
-	void Render() override;
-	void Release() override; 
+    virtual HRESULT Initialize(HINSTANCE hInstance, LPCWSTR title = L"ImageExample",
+        UINT w = 1024, UINT h = 768);
+    void Render() override;
+    void Release() override;
 };
-

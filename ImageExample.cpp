@@ -1,98 +1,174 @@
-#include <fstream>
-#include <vector>
+#include  <fstream>
+#include  <vector>
 #include "ImageExample.h"
 
-HRESULT ImageExample::LoadBMP(LPCUWSTR filename, ID2D1Bitmap** ppBitmap)
+#pragma comment (lib, "WindowsCodecs.lib")
+
+HRESULT ImageExample::LoadBMP(LPCWSTR filename, ID2D1Bitmap** ppBitmap)
 {
-	std::ifstream file;
-	file.open(filename, std::ios::binary);
+    std::ifstream file;
+    file.open(filename, std::ios::binary);
 
-	BITMAPFILEHEADER bfh;
-	BITMAPINFOHEADER bih;
+    BITMAPFILEHEADER bfh;
+    BITMAPINFOHEADER bih;
 
-	file.read(reinterpret_cast<char*>(&bfh), sizeof(BITMAPFILEHEADER));
-	file.read(reinterpret_cast<char*>(&bih), sizeof(BITMAPINFOHEADER));
+    file.read(reinterpret_cast<char*>(&bfh), sizeof(BITMAPFILEHEADER));
+    file.read(reinterpret_cast<char*>(&bih), sizeof(BITMAPINFOHEADER));
 
-	if (bfh.bfType != 0x4D42)
-	{
-		return E_FAIL;
-	}
-	if (bih.biBitCount == 32)
-	{
-		return E_FAIL;
-	}
+    if (bfh.bfType != 0x4D42) // 리틀 인디언 방식
+    {
+        return E_FAIL;
+    }
+    if (bih.biBitCount != 32)
+    {
+        return E_FAIL;
+    }
 
-	std::vector<char> pixels(bih.biSizeImage); // 가로 * 세로 * bpp
-	file.seekg(bfh.bfOffBits);
-	//file.read(&pixels[0], bih.biSizeImage);
+    std::vector<char> pixels(bih.biSizeImage); //  W * H * BPP(크기)
+    file.seekg(bfh.bfOffBits);
 
-	/*int pitch = bih.biWidth * (bih.biBitCount / 8);
-	for (int y = bih.biHeight - 1; y >= 0; y--) 
-	{
-		file.read(&pixels[y * pitch], pitch);
-	}*/
+    int pitch = bih.biWidth * (bih.biBitCount / 8);
+    /* file.read(&pixels[0], bih.biSizeImage);
+    for (int y = bih.biHeight - 1; y >= 0; y--)
+    {
+        file.read(&pixels[y * pitch], pitch);
+    }
+    */
+    int index{};
+    for (int y = bih.biHeight - 1; y >= 0; y--)
+    {
+        index = y * pitch;
+        for (int x = 0; x < bih.biWidth; x++)
+        {
+            char r{}, g{}, b{}, a{};
+            file.read(&b, 1);
+            file.read(&g, 1);
+            file.read(&r, 1);
+            file.read(&a, 1);
 
-	int pitch = bih.biWidth * (bih.biBitCount / 8);
+            if (r == 30 && g == -57/* 199*/ && b == -6 /*250*/)
+            {
+                r = g = b = a = 0;
+            }
 
-	int index{};
-	for (int y = bih.biHeight - 1; y >= 0; y--)
-	{
-		index = y * pitch;
-		for (int x = bih.biHeight; x <bih.biWidth ; x++)
-		{
-			char r{}, g{}, b{}, a{};
-			file.read(&b, 1);
-			file.read(&g, 1);
-			file.read(&r, 1);
-			file.read(&a, 1);
+            pixels[index++] = b;
+            pixels[index++] = g;
+            pixels[index++] = r;
+            pixels[index++] = a;
+        }
+    }
 
-			if (r == 30 && g == 199 && b == 250)
-			{
-				r = g = b = a = 0;
-			}
-			pixels[index++] = b;
-			pixels[index++] = g;
-			pixels[index++] = r;
-			pixels[index++] = a; 
-		}
-	}
+    file.close();
 
-	file.close();
+    HRESULT hr = mspRenderTarget->CreateBitmap(
+        D2D1::SizeU(bih.biWidth, bih.biHeight),
+        D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)),
+        ppBitmap
+    ); 
+    ThrowIfFailed(hr);
 
-	HRESULT hr = mspRenderTarget->CreateBitmap
-	(
-		D2D1::SizeU(bih.biWidth, bih.biHeight),
-		D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,D2D1_ALPHA_MODE_PREMULTIPLIED)),
-		ppBitmap
-	);
-	ThrowIfFailed(hr);
-	
-	(*ppBitmap)->CopyFromMemory(nullptr, &pixels[0], pitch);
 
-	return S_OK;
+    (*ppBitmap)->CopyFromMemory(nullptr, &pixels[0], pitch);
+
+    return S_OK;
+}
+
+HRESULT ImageExample::LoadWIC(LPCWSTR filename, ID2D1Bitmap** ppBitmap)
+{
+    Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+    HRESULT hr;
+
+    // 1. 디코더 만들기- 파일포멧을 해석
+    hr = mspWICFactory->CreateDecoderFromFilename(
+        filename,
+        nullptr,
+        GENERIC_READ,
+        WICDecodeMetadataCacheOnLoad,
+        decoder.GetAddressOf()
+    );
+    ThrowIfFailed(hr);
+
+    // 2. 해석한 다음 그림 1장을 가져옴
+    Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+    decoder->GetFrame(0, frame.GetAddressOf());
+    ThrowIfFailed(hr);
+
+    // 3. 그림을 B G R A 순서로 바꿈
+    Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
+    hr = mspWICFactory->CreateFormatConverter(converter.GetAddressOf());
+    // 인터페이스 만들때 별 정보가 없음 - 직접 초기화 해야해서
+    ThrowIfFailed(hr);
+
+    hr = converter->Initialize(
+        frame.Get(),
+        GUID_WICPixelFormat32bppPBGRA,
+        WICBitmapDitherTypeNone,
+        nullptr,
+        0,
+        WICBitmapPaletteTypeCustom
+    );
+
+    ThrowIfFailed(hr);
+
+    // 4. 컨버팅 된 정보를 가지고 그림파일을 만듦  
+    // WIC 장점: 알아서 뒤집힌 것도 돌려줌
+    hr = mspRenderTarget->CreateBitmapFromWicBitmap(
+        converter.Get(),
+        ppBitmap
+    );
+
+    ThrowIfFailed(hr);
+
+    return S_OK;
 }
 
 HRESULT ImageExample::CreateDeviceResources()
 {
-	D2DFramework::CreateDeviceResources();
+    D2DFramework::CreateDeviceResources();
+    HRESULT hr = LoadWIC(L"Images/32.bmp", mspBitmap.ReleaseAndGetAddressOf());
+    ThrowIfFailed(hr);
 
-	HRESULT hr = LoadBMP(L"Images/32.bmp", mspBitmap.ReleaseAndGetAddressOf());
-	ThrowIfFailed(hr);
+    return S_OK;
+}
 
-	return S_OK;
+HRESULT ImageExample::Initialize(HINSTANCE hInstance, LPCWSTR title, UINT w, UINT h)
+{
+    HRESULT hr = CoInitialize(nullptr);  
+    ThrowIfFailed(hr);
+    hr = ::CoCreateInstance(   
+        CLSID_WICImagingFactory,
+        nullptr,
+        CLSCTX_INPROC_SERVER,
+        IID_PPV_ARGS(mspWICFactory.GetAddressOf())
+    );
+    ThrowIfFailed(hr);
+
+    D2DFramework::Initialize(hInstance, title, w, h);
+    return S_OK;
 }
 
 void ImageExample::Render()
 {
-	mspRenderTarget->BeginDraw();
-	mspRenderTarget->Clear(D2D1::ColorF(0.0f, 0.2f, 0.4f, 1.0f));
+    mspRenderTarget->BeginDraw();
+    mspRenderTarget->Clear(D2D1::ColorF(0.0f, 0.2f, 0.4f, 1.0f));
 
-	mspRenderTarget->DrawBitmap(mspBitmap.Get());
+    mspRenderTarget->DrawBitmap(mspBitmap.Get());
 
-	HRESULT hr = mspRenderTarget->EndDraw();
 
-	if (hr == D2DERR_RECREATE_TARGET)
-	{
-		CreateDeviceResources();
-	}
+    HRESULT hr = mspRenderTarget->EndDraw();
+
+    if (hr == D2DERR_RECREATE_TARGET)
+    {
+        CreateDeviceResources();
+    }
+}
+
+void ImageExample::Release()
+{
+    D2DFramework::Release();
+
+    mspBitmap.Reset();
+    mspWICFactory.Reset();
+
+    CoUninitialize(); 
 }
