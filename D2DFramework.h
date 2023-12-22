@@ -51,6 +51,5 @@ public:
 	virtual void Render();
 
 	void ShowError(LPCWSTR msg, LPCWSTR title = L"Error");
-
 	static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 };
